@@ -97,6 +97,7 @@ function TemplateCard({ template, groups, zones, libraryTasks, onEdit, onDuplica
   const assignedZones = zones.filter(z => template.zoneIds?.includes(z.id));
   const selectedTasks = template.selectedTasks || [];
   const totalTime = selectedTasks.reduce((acc, t) => acc + (parseInt(t.estimatedMinutes) || 0), 0);
+  const tasksWithPhoto = selectedTasks.filter(t => t.requiresPhoto).length;
 
   return (
     <Card className="p-6 group relative overflow-hidden">
@@ -137,13 +138,21 @@ function TemplateCard({ template, groups, zones, libraryTasks, onEdit, onDuplica
       {/* Tareas asignadas ordenadas por hora */}
       {selectedTasks.length > 0 && (
         <div className="mb-4 p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl">
-          <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-2">Tareas ({totalTime} min total)</p>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600">Tareas ({totalTime} min)</p>
+            {tasksWithPhoto > 0 && (
+              <span className="flex items-center gap-1 text-[10px] text-purple-600 font-bold">
+                <Camera size={10} /> {tasksWithPhoto}
+              </span>
+            )}
+          </div>
           <div className="space-y-1">
             {[...selectedTasks].sort((a, b) => (a.dueTime || '').localeCompare(b.dueTime || '')).slice(0, 3).map(task => (
               <div key={task.id} className="flex items-center gap-2 text-xs text-emerald-700">
                 <span className="font-mono text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded text-[10px]">{task.dueTime || '--:--'}</span>
+                {task.requiresPhoto && <Camera size={10} className="text-purple-500 shrink-0" />}
                 <span className="font-medium truncate">{task.name}</span>
-                <span className="text-emerald-500 shrink-0">({task.estimatedMinutes}min)</span>
+                <span className="text-emerald-500 shrink-0">({task.estimatedMinutes}m)</span>
               </div>
             ))}
             {selectedTasks.length > 3 && (
@@ -245,11 +254,21 @@ function TemplateEditor({ open, onClose, onSave, template, groups, zones, librar
             name: libraryTask?.name,
             category: libraryTask?.category,
             estimatedMinutes: libraryTask?.estimatedMinutes || 15,
-            dueTime: '09:00'
+            dueTime: '09:00',
+            requiresPhoto: false
           }]
         };
       }
     });
+  };
+
+  const toggleTaskPhoto = (taskId) => {
+    setForm(prev => ({
+      ...prev,
+      selectedTasks: prev.selectedTasks.map(t =>
+        t.id === taskId ? { ...t, requiresPhoto: !t.requiresPhoto } : t
+      )
+    }));
   };
 
   const updateTaskTime = (taskId, minutes) => {
@@ -467,36 +486,40 @@ function TemplateEditor({ open, onClose, onSave, template, groups, zones, librar
                   <div className="space-y-2 max-h-[200px] overflow-y-auto">
                     {selectedTasks.map((task, index) => (
                       <div key={task.id} className="flex items-center gap-2 p-2 bg-white dark:bg-slate-800 rounded-lg">
-                        <span className="w-6 h-6 flex items-center justify-center bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 text-xs font-black rounded-full">
+                        <span className="w-6 h-6 flex items-center justify-center bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 text-xs font-black rounded-full shrink-0">
                           {index + 1}
                         </span>
                         <button
                           type="button"
                           onClick={() => toggleTask(task.id)}
-                          className="p-1 hover:bg-red-50 rounded text-red-400"
+                          className="p-1 hover:bg-red-50 rounded text-red-400 shrink-0"
                         >
                           <Trash2 size={14} />
                         </button>
                         <span className="flex-1 text-sm font-medium truncate">{task.name}</span>
-                        <div className="flex items-center gap-2">
-                          <div className="flex items-center gap-1">
-                            <input
-                              type="time"
-                              value={task.dueTime || '09:00'}
-                              onChange={(e) => updateTaskDueTime(task.id, e.target.value)}
-                              className="w-24 px-2 py-1 text-xs text-center rounded-lg bg-amber-50 dark:bg-amber-900/20 text-amber-700 font-bold border border-amber-200"
-                            />
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <input
-                              type="number"
-                              min="1"
-                              value={task.estimatedMinutes}
-                              onChange={(e) => updateTaskTime(task.id, e.target.value)}
-                              className="w-14 px-2 py-1 text-xs text-center rounded-lg bg-slate-100 dark:bg-slate-700 font-bold"
-                            />
-                            <span className="text-[10px] text-slate-400">min</span>
-                          </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => toggleTaskPhoto(task.id)}
+                            className={`p-1.5 rounded-lg transition-colors ${task.requiresPhoto ? 'bg-purple-100 text-purple-600' : 'bg-slate-100 text-slate-400 hover:bg-purple-50'}`}
+                            title={task.requiresPhoto ? 'Foto obligatoria' : 'Sin foto'}
+                          >
+                            <Camera size={14} />
+                          </button>
+                          <input
+                            type="time"
+                            value={task.dueTime || '09:00'}
+                            onChange={(e) => updateTaskDueTime(task.id, e.target.value)}
+                            className="w-20 px-1.5 py-1 text-xs text-center rounded-lg bg-amber-50 dark:bg-amber-900/20 text-amber-700 font-bold border border-amber-200"
+                          />
+                          <input
+                            type="number"
+                            min="1"
+                            value={task.estimatedMinutes}
+                            onChange={(e) => updateTaskTime(task.id, e.target.value)}
+                            className="w-12 px-1 py-1 text-xs text-center rounded-lg bg-slate-100 dark:bg-slate-700 font-bold"
+                          />
+                          <span className="text-[10px] text-slate-400">m</span>
                         </div>
                       </div>
                     ))}

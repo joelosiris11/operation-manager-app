@@ -210,16 +210,35 @@ function RoutineCard({ routine, templates, groups, zones, onEdit, onDelete, onTo
         </button>
       </div>
 
-      {/* Resumen de tareas */}
+      {/* Resumen de tareas con horarios */}
       {totalTasks > 0 && (
-        <div className="flex items-center gap-4 mb-4 p-2 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl">
-          <div className="flex items-center gap-1.5 text-indigo-600">
-            <CheckCircle2 size={14} />
-            <span className="text-sm font-bold">{totalTasks} tareas</span>
+        <div className="mb-4 p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl">
+          <div className="flex items-center gap-4 mb-2">
+            <div className="flex items-center gap-1.5 text-indigo-600">
+              <CheckCircle2 size={14} />
+              <span className="text-sm font-bold">{totalTasks} tareas</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-indigo-600">
+              <Clock size={14} />
+              <span className="text-sm font-bold">~{totalTime} min</span>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5 text-indigo-600">
-            <Clock size={14} />
-            <span className="text-sm font-bold">~{totalTime} min</span>
+          {/* Mostrar horarios de tareas */}
+          <div className="space-y-1 max-h-[80px] overflow-y-auto">
+            {selectedTemplates.flatMap(t => t.selectedTasks || [])
+              .sort((a, b) => (a.dueTime || '').localeCompare(b.dueTime || ''))
+              .slice(0, 4)
+              .map((task, idx) => (
+                <div key={idx} className="flex items-center gap-2 text-xs">
+                  <span className="font-mono text-amber-600 bg-amber-100 px-1 py-0.5 rounded text-[10px]">
+                    {task.dueTime || '--:--'}
+                  </span>
+                  <span className="text-indigo-700 truncate">{task.name}</span>
+                </div>
+              ))}
+            {selectedTemplates.flatMap(t => t.selectedTasks || []).length > 4 && (
+              <p className="text-[10px] text-indigo-500">+{selectedTemplates.flatMap(t => t.selectedTasks || []).length - 4} más</p>
+            )}
           </div>
         </div>
       )}

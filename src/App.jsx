@@ -81,7 +81,7 @@ export default function App() {
         <Header setIsSidebarOpen={setIsSidebarOpen} currentUser={currentUser} onLogout={handleLogout} />
 
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
-          {currentView === 'dashboard' && <Dashboard currentUser={currentUser} />}
+          {currentView === 'dashboard' && <Dashboard currentUser={currentUser} onNavigate={setCurrentView} />}
           {currentView === 'zones' && canAccessAdmin && <ZonesModule />}
           {currentView === 'groups' && canAccessAdmin && <GroupsModule />}
           {currentView === 'users' && canAccessAdmin && <UsersModule />}

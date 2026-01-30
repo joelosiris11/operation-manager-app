@@ -7,7 +7,7 @@ import { Card, Badge, StatusIndicator } from '../../components/ui';
 import { useZones, useGroups, useUsers, useTemplates, useRoutines, useForms } from '../../hooks/useFirestore';
 import { EXECUTION_STATUS } from '../../lib/constants';
 
-export default function Dashboard() {
+export default function Dashboard({ currentUser, onNavigate }) {
   const { data: zones } = useZones();
   const { data: groups } = useGroups();
   const { data: users } = useUsers();
@@ -65,7 +65,7 @@ export default function Dashboard() {
       {/* Resumen de configuración */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Zonas */}
-        <Card className="p-6">
+        <Card className="p-6 cursor-pointer hover:shadow-lg transition-shadow" onClick={() => onNavigate && onNavigate('zones')}>
           <div className="flex items-center gap-3 mb-4">
             <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600">
               <MapPin size={20} />
@@ -89,7 +89,7 @@ export default function Dashboard() {
         </Card>
 
         {/* Grupos */}
-        <Card className="p-6">
+        <Card className="p-6 cursor-pointer hover:shadow-lg transition-shadow" onClick={() => onNavigate && onNavigate('groups')}>
           <div className="flex items-center gap-3 mb-4">
             <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600">
               <Users size={20} />
@@ -113,7 +113,7 @@ export default function Dashboard() {
         </Card>
 
         {/* Plantillas */}
-        <Card className="p-6">
+        <Card className="p-6 cursor-pointer hover:shadow-lg transition-shadow" onClick={() => onNavigate && onNavigate('templates')}>
           <div className="flex items-center gap-3 mb-4">
             <div className="p-2 rounded-xl bg-purple-50 dark:bg-purple-900/20 text-purple-600">
               <FileText size={20} />
@@ -124,12 +124,16 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="space-y-2">
-            {templates.slice(0, 4).map(template => (
-              <div key={template.id} className="flex items-center justify-between py-2 border-b dark:border-slate-800 last:border-0">
-                <span className="text-sm font-medium">{template.name}</span>
-                <Badge variant="primary">{template.questions?.length || 0} preguntas</Badge>
-              </div>
-            ))}
+            {templates.slice(0, 4).map(template => {
+              const taskCount = template.selectedTasks?.length || 0;
+              const totalTime = (template.selectedTasks || []).reduce((sum, t) => sum + (parseInt(t.estimatedMinutes) || 0), 0);
+              return (
+                <div key={template.id} className="flex items-center justify-between py-2 border-b dark:border-slate-800 last:border-0">
+                  <span className="text-sm font-medium">{template.name}</span>
+                  <Badge variant="primary">{taskCount} tareas • {totalTime}min</Badge>
+                </div>
+              );
+            })}
             {templates.length > 4 && (
               <p className="text-xs text-slate-400 pt-2">+{templates.length - 4} más</p>
             )}
@@ -140,7 +144,10 @@ export default function Dashboard() {
       {/* Rutinas activas */}
       <Card className="p-6">
         <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
+          <div
+            className="flex items-center gap-3 cursor-pointer hover:opacity-70 transition-opacity"
+            onClick={() => onNavigate && onNavigate('routines')}
+          >
             <div className="p-2 rounded-xl bg-teal-50 dark:bg-teal-900/20 text-teal-600">
               <Calendar size={20} />
             </div>
@@ -152,14 +159,34 @@ export default function Dashboard() {
         {activeRoutines.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {activeRoutines.slice(0, 6).map(routine => {
-              const template = templates.find(t => t.id === routine.templateId);
+              // Soportar templateIds (nuevo) y templateId (legacy)
+              const routineTemplateIds = routine.templateIds || (routine.templateId ? [routine.templateId] : []);
+              const routineTemplates = templates.filter(t => routineTemplateIds.includes(t.id));
+              const totalTasks = routineTemplates.reduce((acc, t) => acc + (t.selectedTasks?.length || 0), 0);
+              const totalTime = routineTemplates.reduce((acc, t) => {
+                return acc + (t.selectedTasks || []).reduce((sum, task) => sum + (parseInt(task.estimatedMinutes) || 0), 0);
+              }, 0);
+
               return (
-                <div key={routine.id} className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl">
+                <div
+                  key={routine.id}
+                  className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors"
+                  onClick={() => onNavigate && onNavigate('routines')}
+                >
                   <div className="flex items-center gap-2 mb-2">
                     <StatusIndicator status="active" pulse />
                     <span className="font-bold text-sm uppercase tracking-tight">{routine.name}</span>
                   </div>
-                  <p className="text-xs text-slate-500">{template?.name || 'Sin plantilla'}</p>
+                  <p className="text-xs text-slate-500">
+                    {routineTemplates.length > 0
+                      ? routineTemplates.map(t => t.name).join(', ')
+                      : 'Sin plantilla'}
+                  </p>
+                  {totalTasks > 0 && (
+                    <p className="text-[10px] text-indigo-500 font-bold mt-1">
+                      {totalTasks} tareas • {totalTime} min
+                    </p>
+                  )}
                   <p className="text-[10px] text-slate-400 mt-1">
                     {routine.frequency === 'daily' ? 'Diario' : routine.frequency === 'hourly' ? `Cada ${routine.hourInterval}h` : 'Semanal'}
                     {routine.time && ` • ${routine.time}`}
