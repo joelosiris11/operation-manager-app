@@ -16,7 +16,7 @@ export function Card({ children, className = '', onClick }) {
 // --- Button ---
 export function Button({ children, variant = 'primary', size = 'md', icon: Icon, loading, disabled, className = '', ...props }) {
   const variants = {
-    primary: 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-lg shadow-indigo-200/50',
+    primary: 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-lg shadow-indigo-200/50 dark:shadow-none',
     secondary: 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200',
     danger: 'bg-red-500 text-white hover:bg-red-600',
     success: 'bg-emerald-500 text-white hover:bg-emerald-600',
@@ -25,25 +25,25 @@ export function Button({ children, variant = 'primary', size = 'md', icon: Icon,
   };
 
   const sizes = {
-    sm: 'px-4 py-2 text-xs',
-    md: 'px-6 py-3 text-sm',
-    lg: 'px-8 py-4 text-base',
-    xl: 'px-10 py-5 text-lg',
+    sm: 'px-3 py-2 text-[11px] sm:px-4 sm:text-xs',
+    md: 'px-4 py-2.5 text-xs sm:px-6 sm:py-3 sm:text-sm',
+    lg: 'px-6 py-3 text-sm sm:px-8 sm:py-4 sm:text-base',
+    xl: 'px-8 py-4 text-base sm:px-10 sm:py-5 sm:text-lg',
   };
 
   return (
     <button
       className={`
         ${variants[variant]} ${sizes[size]}
-        font-bold uppercase tracking-wider rounded-2xl
+        font-bold uppercase tracking-wider rounded-xl sm:rounded-2xl
         transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed
-        flex items-center justify-center gap-2
+        flex items-center justify-center gap-1.5 sm:gap-2
         ${className}
       `}
       disabled={disabled || loading}
       {...props}
     >
-      {loading ? <Loader2 size={18} className="animate-spin" /> : Icon && <Icon size={18} />}
+      {loading ? <Loader2 size={16} className="animate-spin sm:w-[18px] sm:h-[18px]" /> : Icon && <Icon size={16} className="sm:w-[18px] sm:h-[18px]" />}
       {children}
     </button>
   );
@@ -52,12 +52,12 @@ export function Button({ children, variant = 'primary', size = 'md', icon: Icon,
 // --- Input ---
 export function Input({ label, error, className = '', ...props }) {
   return (
-    <div className="space-y-2">
+    <div className="space-y-1.5 sm:space-y-2">
       {label && <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">{label}</label>}
       <input
         className={`
-          w-full p-4 rounded-2xl bg-slate-50 dark:bg-slate-800
-          border-2 border-transparent font-medium
+          w-full p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-50 dark:bg-slate-800
+          border-2 border-transparent font-medium text-sm sm:text-base
           outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500
           transition-all
           ${error ? 'border-red-500' : ''}
@@ -143,16 +143,16 @@ export function Modal({ open, onClose, title, children, size = 'md' }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className={`relative bg-white dark:bg-slate-900 rounded-[2.5rem] w-full ${sizes[size]} max-h-[90vh] overflow-hidden shadow-2xl`}>
-        <div className="flex items-center justify-between p-6 border-b dark:border-slate-800">
-          <h2 className="text-xl font-black uppercase tracking-tight">{title}</h2>
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm z-[100]" onClick={onClose} />
+      <div className={`relative z-[101] bg-white dark:bg-slate-900 rounded-t-[2rem] sm:rounded-[2rem] w-full ${sizes[size]} max-h-[95vh] sm:max-h-[90vh] overflow-hidden shadow-2xl flex flex-col`}>
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b dark:border-slate-800 shrink-0">
+          <h2 className="text-lg sm:text-xl font-black uppercase tracking-tight">{title}</h2>
           <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors">
             <X size={20} />
           </button>
         </div>
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-80px)]">
+        <div className="p-4 sm:p-6 overflow-y-auto flex-1">
           {children}
         </div>
       </div>
@@ -179,10 +179,10 @@ export function EmptyState({ icon: Icon, title, description, action }) {
 // --- Section Header ---
 export function SectionHeader({ title, subtitle, action }) {
   return (
-    <div className="flex justify-between items-end mb-8">
+    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 mb-6 sm:mb-8">
       <div>
-        <h2 className="text-4xl font-black tracking-tighter uppercase leading-none">{title}</h2>
-        {subtitle && <p className="text-slate-500 font-bold text-[10px] uppercase tracking-[0.3em] mt-3 opacity-60">{subtitle}</p>}
+        <h2 className="text-2xl sm:text-4xl font-black tracking-tighter uppercase leading-none">{title}</h2>
+        {subtitle && <p className="text-slate-500 font-bold text-[10px] uppercase tracking-[0.3em] mt-2 sm:mt-3 opacity-60">{subtitle}</p>}
       </div>
       {action}
     </div>

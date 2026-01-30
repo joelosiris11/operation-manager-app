@@ -219,6 +219,7 @@ export const SEED_DATA = {
     { id: 'user-2', name: 'María García', email: 'maria@empresa.com', role: 'operator', groupIds: ['group-2'], pin: '1234' },
     { id: 'user-3', name: 'Carlos López', email: 'carlos@empresa.com', role: 'supervisor', groupIds: ['group-3'], pin: '5678' },
     { id: 'user-4', name: 'Ana Martínez', email: 'ana@empresa.com', role: 'manager', groupIds: [], pin: '9999' },
+    { id: 'user-admin', name: 'Administrador', email: 'admin@empresa.com', role: 'admin', groupIds: [], pin: '0000' },
   ],
   tasks: [
     { id: 'task-1', name: 'Limpiar piso', category: 'cleaning', isLibraryTask: true, estimatedMinutes: 15 },

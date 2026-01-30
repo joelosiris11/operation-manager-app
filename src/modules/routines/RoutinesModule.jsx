@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Calendar, Plus, Trash2, Edit2, Clock, Play, Pause, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Calendar, Plus, Trash2, Edit2, Clock, Play, Pause, AlertTriangle, CheckCircle2, FileText } from 'lucide-react';
 import { Card, Button, Input, Select, Modal, Badge, EmptyState, SectionHeader, Toggle, StatusIndicator } from '../../components/ui';
 import { useRoutines, useTemplates, useGroups, useZones } from '../../hooks/useFirestore';
 import { ROUTINE_FREQUENCIES } from '../../lib/constants';
@@ -96,7 +96,7 @@ export default function RoutinesModule() {
               <RoutineCard
                 key={routine.id}
                 routine={routine}
-                template={templates.find(t => t.id === routine.templateId)}
+                templates={templates}
                 groups={groups}
                 zones={zones}
                 onEdit={() => handleEdit(routine)}
@@ -122,7 +122,7 @@ export default function RoutinesModule() {
               <RoutineCard
                 key={routine.id}
                 routine={routine}
-                template={templates.find(t => t.id === routine.templateId)}
+                templates={templates}
                 groups={groups}
                 zones={zones}
                 onEdit={() => handleEdit(routine)}
@@ -156,10 +156,18 @@ export default function RoutinesModule() {
   );
 }
 
-function RoutineCard({ routine, template, groups, zones, onEdit, onDelete, onToggle }) {
+function RoutineCard({ routine, templates, groups, zones, onEdit, onDelete, onToggle }) {
   const frequency = ROUTINE_FREQUENCIES.find(f => f.id === routine.frequency);
   const assignedGroups = groups.filter(g => routine.groupIds?.includes(g.id));
   const assignedZones = zones.filter(z => routine.zoneIds?.includes(z.id));
+
+  // Calcular total de tareas y tiempo de todas las plantillas
+  const selectedTemplates = templates.filter(t => routine.templateIds?.includes(t.id));
+  const totalTasks = selectedTemplates.reduce((acc, t) => acc + (t.selectedTasks?.length || 0), 0);
+  const totalTime = selectedTemplates.reduce((acc, t) => {
+    const templateTime = (t.selectedTasks || []).reduce((sum, task) => sum + (parseInt(task.estimatedMinutes) || 0), 0);
+    return acc + templateTime;
+  }, 0);
 
   const getScheduleText = () => {
     if (routine.frequency === 'hourly') {
@@ -189,7 +197,7 @@ function RoutineCard({ routine, template, groups, zones, onEdit, onDelete, onTog
           <div>
             <h3 className="font-bold text-lg uppercase tracking-tight">{routine.name}</h3>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-              {template?.name || 'Sin plantilla'}
+              {selectedTemplates.length} plantilla{selectedTemplates.length !== 1 ? 's' : ''}
             </p>
           </div>
         </div>
@@ -202,11 +210,34 @@ function RoutineCard({ routine, template, groups, zones, onEdit, onDelete, onTog
         </button>
       </div>
 
+      {/* Resumen de tareas */}
+      {totalTasks > 0 && (
+        <div className="flex items-center gap-4 mb-4 p-2 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl">
+          <div className="flex items-center gap-1.5 text-indigo-600">
+            <CheckCircle2 size={14} />
+            <span className="text-sm font-bold">{totalTasks} tareas</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-indigo-600">
+            <Clock size={14} />
+            <span className="text-sm font-bold">~{totalTime} min</span>
+          </div>
+        </div>
+      )}
+
       {/* Schedule */}
       <div className="flex items-center gap-2 mb-4 text-sm">
         <Clock size={14} className="text-indigo-500" />
         <span className="font-medium">{getScheduleText()}</span>
       </div>
+
+      {/* Plantillas incluidas */}
+      {selectedTemplates.length > 0 && (
+        <div className="flex flex-wrap gap-1 mb-4">
+          {selectedTemplates.map(t => (
+            <Badge key={t.id} variant="primary">{t.name}</Badge>
+          ))}
+        </div>
+      )}
 
       {/* Ventana de ejecución */}
       {routine.windowStart && routine.windowEnd && (
@@ -242,7 +273,7 @@ function RoutineCard({ routine, template, groups, zones, onEdit, onDelete, onTog
 function RoutineFormModal({ open, onClose, onSave, routine, templates, groups, zones }) {
   const [form, setForm] = useState({
     name: '',
-    templateId: '',
+    templateIds: [],
     frequency: 'daily',
     time: '09:00',
     hourInterval: 2,
@@ -255,11 +286,19 @@ function RoutineFormModal({ open, onClose, onSave, routine, templates, groups, z
     active: true,
   });
 
+  // Calcular totales de las plantillas seleccionadas
+  const selectedTemplates = templates.filter(t => form.templateIds.includes(t.id));
+  const totalTasks = selectedTemplates.reduce((acc, t) => acc + (t.selectedTasks?.length || 0), 0);
+  const totalTime = selectedTemplates.reduce((acc, t) => {
+    const templateTime = (t.selectedTasks || []).reduce((sum, task) => sum + (parseInt(task.estimatedMinutes) || 0), 0);
+    return acc + templateTime;
+  }, 0);
+
   React.useEffect(() => {
     if (routine) {
       setForm({
         name: routine.name || '',
-        templateId: routine.templateId || '',
+        templateIds: routine.templateIds || (routine.templateId ? [routine.templateId] : []),
         frequency: routine.frequency || 'daily',
         time: routine.time || '09:00',
         hourInterval: routine.hourInterval || 2,
@@ -274,7 +313,7 @@ function RoutineFormModal({ open, onClose, onSave, routine, templates, groups, z
     } else {
       setForm({
         name: '',
-        templateId: '',
+        templateIds: [],
         frequency: 'daily',
         time: '09:00',
         hourInterval: 2,
@@ -288,6 +327,15 @@ function RoutineFormModal({ open, onClose, onSave, routine, templates, groups, z
       });
     }
   }, [routine, open]);
+
+  const toggleTemplate = (templateId) => {
+    setForm(prev => ({
+      ...prev,
+      templateIds: prev.templateIds.includes(templateId)
+        ? prev.templateIds.filter(id => id !== templateId)
+        : [...prev.templateIds, templateId]
+    }));
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -307,23 +355,70 @@ function RoutineFormModal({ open, onClose, onSave, routine, templates, groups, z
   return (
     <Modal open={open} onClose={onClose} title={routine ? 'Editar Rutina' : 'Nueva Rutina'} size="lg">
       <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Input
-            label="Nombre de la Rutina"
-            placeholder="Ej: Inspección Matutina"
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            required
-          />
-          <Select
-            label="Plantilla Base"
-            value={form.templateId}
-            onChange={(e) => setForm({ ...form, templateId: e.target.value })}
-            options={[
-              { value: '', label: 'Seleccionar plantilla...' },
-              ...templates.map(t => ({ value: t.id, label: t.name }))
-            ]}
-          />
+        <Input
+          label="Nombre de la Rutina"
+          placeholder="Ej: Inspección Matutina"
+          value={form.name}
+          onChange={(e) => setForm({ ...form, name: e.target.value })}
+          required
+        />
+
+        {/* Selección de plantillas */}
+        <div className="space-y-3">
+          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Plantillas incluidas</p>
+
+          {/* Resumen */}
+          {form.templateIds.length > 0 && (
+            <div className="flex items-center gap-4 p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl">
+              <div className="flex items-center gap-2 text-indigo-600">
+                <FileText size={16} />
+                <span className="font-bold text-sm">{form.templateIds.length} plantilla{form.templateIds.length !== 1 ? 's' : ''}</span>
+              </div>
+              <div className="flex items-center gap-2 text-indigo-600">
+                <CheckCircle2 size={16} />
+                <span className="font-bold text-sm">{totalTasks} tareas</span>
+              </div>
+              <div className="flex items-center gap-2 text-indigo-600">
+                <Clock size={16} />
+                <span className="font-bold text-sm">~{totalTime} min</span>
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[200px] overflow-y-auto p-1">
+            {templates.length > 0 ? templates.map(template => {
+              const templateTasks = template.selectedTasks?.length || 0;
+              const templateTime = (template.selectedTasks || []).reduce((sum, t) => sum + (parseInt(t.estimatedMinutes) || 0), 0);
+              const isSelected = form.templateIds.includes(template.id);
+
+              return (
+                <button
+                  key={template.id}
+                  type="button"
+                  onClick={() => toggleTemplate(template.id)}
+                  className={`flex items-start gap-3 p-3 rounded-xl text-left transition-all border-2
+                    ${isSelected
+                      ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-500'
+                      : 'bg-white dark:bg-slate-800 border-transparent hover:border-slate-200'}`}
+                >
+                  <div className={`w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5
+                    ${isSelected ? 'bg-indigo-500 text-white' : 'bg-slate-200 dark:bg-slate-700'}`}>
+                    {isSelected && <CheckCircle2 size={12} />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-sm truncate">{template.name}</p>
+                    <p className="text-[10px] text-slate-400">
+                      {templateTasks} tareas · {templateTime} min
+                    </p>
+                  </div>
+                </button>
+              );
+            }) : (
+              <p className="col-span-2 text-center py-4 text-slate-400 text-sm">
+                No hay plantillas creadas
+              </p>
+            )}
+          </div>
         </div>
 
         {/* Frecuencia */}

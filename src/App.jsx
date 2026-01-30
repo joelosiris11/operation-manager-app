@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import {
   Home, MapPin, Users, UserCircle, FileText, ClipboardList,
   Calendar, Package, Menu, X, Briefcase, ShieldCheck, Settings,
-  Bell, User, ChevronRight, Database, Download, Upload, Trash2, RefreshCw
+  Bell, User, ChevronRight, ChevronDown, Database, Download, Upload, Trash2, RefreshCw, LogOut
 } from 'lucide-react';
 import { USE_LOCAL_DB } from './lib/firebase';
-import { useLocalDB } from './hooks/useFirestore';
+import { useLocalDB, useUsers } from './hooks/useFirestore';
+import Login from './components/Login';
 
 // Modules
 import Dashboard from './modules/dashboard/Dashboard';
@@ -17,10 +18,52 @@ import TasksLibrary from './modules/tasks/TasksLibrary';
 import RoutinesModule from './modules/routines/RoutinesModule';
 import ProductsModule from './modules/products/ProductsModule';
 
+const SESSION_KEY = 'opsflow-session';
+
 export default function App() {
-  const [userId] = useState('local-user');
+  const [currentUser, setCurrentUser] = useState(null);
   const [currentView, setCurrentView] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const { data: users } = useUsers();
+
+  // Cargar sesión al iniciar
+  useEffect(() => {
+    const savedSession = localStorage.getItem(SESSION_KEY);
+    if (savedSession) {
+      try {
+        const user = JSON.parse(savedSession);
+        setCurrentUser(user);
+      } catch (e) {
+        localStorage.removeItem(SESSION_KEY);
+      }
+    }
+    setIsLoading(false);
+  }, []);
+
+  const handleLogin = (user) => {
+    setCurrentUser(user);
+    localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    localStorage.removeItem(SESSION_KEY);
+    setCurrentView('dashboard');
+  };
+
+  // Loading inicial
+  if (isLoading) {
+    return <LoadingScreen />;
+  }
+
+  // Si no hay usuario, mostrar login
+  if (!currentUser) {
+    return <Login users={users} onLogin={handleLogin} />;
+  }
+
+  // Verificar permisos para admin
+  const canAccessAdmin = ['admin', 'manager'].includes(currentUser.role);
 
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-slate-950 font-sans text-slate-900 dark:text-slate-100">
@@ -29,16 +72,19 @@ export default function App() {
         setCurrentView={setCurrentView}
         isSidebarOpen={isSidebarOpen}
         setIsSidebarOpen={setIsSidebarOpen}
+        currentUser={currentUser}
+        canAccessAdmin={canAccessAdmin}
+        onLogout={handleLogout}
       />
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Header setIsSidebarOpen={setIsSidebarOpen} userId={userId} />
+        <Header setIsSidebarOpen={setIsSidebarOpen} currentUser={currentUser} onLogout={handleLogout} />
 
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
-          {currentView === 'dashboard' && <Dashboard />}
-          {currentView === 'zones' && <ZonesModule />}
-          {currentView === 'groups' && <GroupsModule />}
-          {currentView === 'users' && <UsersModule />}
+          {currentView === 'dashboard' && <Dashboard currentUser={currentUser} />}
+          {currentView === 'zones' && canAccessAdmin && <ZonesModule />}
+          {currentView === 'groups' && canAccessAdmin && <GroupsModule />}
+          {currentView === 'users' && canAccessAdmin && <UsersModule />}
           {currentView === 'templates' && <TemplatesModule />}
           {currentView === 'tasks' && <TasksLibrary />}
           {currentView === 'routines' && <RoutinesModule />}
@@ -62,40 +108,33 @@ function LoadingScreen() {
   );
 }
 
-function Sidebar({ currentView, setCurrentView, isSidebarOpen, setIsSidebarOpen }) {
+function Sidebar({ currentView, setCurrentView, isSidebarOpen, setIsSidebarOpen, currentUser, canAccessAdmin, onLogout }) {
   const { exportData, clearData, resetToSeed } = useLocalDB();
   const [showDataMenu, setShowDataMenu] = useState(false);
+  const [adminExpanded, setAdminExpanded] = useState(false);
 
-  const navSections = [
-    {
-      title: 'Principal',
-      items: [
-        { id: 'dashboard', icon: Home, label: 'Dashboard' },
-      ]
-    },
-    {
-      title: 'Configuración',
-      items: [
-        { id: 'zones', icon: MapPin, label: 'Zonas' },
-        { id: 'groups', icon: Users, label: 'Grupos' },
-        { id: 'users', icon: UserCircle, label: 'Personal' },
-      ]
-    },
-    {
-      title: 'Operación',
-      items: [
-        { id: 'templates', icon: FileText, label: 'Plantillas' },
-        { id: 'tasks', icon: ClipboardList, label: 'Librería Tareas' },
-        { id: 'routines', icon: Calendar, label: 'Rutinas' },
-      ]
-    },
-    {
-      title: 'Inventario',
-      items: [
-        { id: 'products', icon: Package, label: 'Productos' },
-      ]
-    },
+  const adminSubItems = [
+    { id: 'zones', icon: MapPin, label: 'Zonas' },
+    { id: 'groups', icon: Users, label: 'Grupos' },
+    { id: 'users', icon: UserCircle, label: 'Personal' },
   ];
+
+  const isAdminView = adminSubItems.some(item => item.id === currentView);
+
+  const navItems = [
+    { id: 'dashboard', icon: Home, label: 'Dashboard' },
+    { id: 'templates', icon: FileText, label: 'Plantillas' },
+    { id: 'tasks', icon: ClipboardList, label: 'Librería Tareas' },
+    { id: 'routines', icon: Calendar, label: 'Rutinas' },
+    { id: 'products', icon: Package, label: 'Productos' },
+  ];
+
+  const roleLabels = {
+    admin: 'Administrador',
+    manager: 'Gerente',
+    supervisor: 'Supervisor',
+    operator: 'Operador',
+  };
 
   return (
     <>
@@ -124,37 +163,78 @@ function Sidebar({ currentView, setCurrentView, isSidebarOpen, setIsSidebarOpen 
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-4 py-6 space-y-6 overflow-y-auto">
-          {navSections.map(section => (
-            <div key={section.title}>
-              <p className="px-3 mb-2 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">
-                {section.title}
-              </p>
-              <div className="space-y-1">
-                {section.items.map(item => (
-                  <button
-                    key={item.id}
-                    onClick={() => {
-                      setCurrentView(item.id);
-                      setIsSidebarOpen(false);
-                    }}
-                    className={`
-                      w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-200
-                      ${currentView === item.id
-                        ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200/50 dark:shadow-none'
-                        : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'}
-                    `}
-                  >
-                    <item.icon size={20} />
-                    <span className="font-bold text-sm">{item.label}</span>
-                    {currentView === item.id && (
-                      <ChevronRight size={16} className="ml-auto" />
-                    )}
-                  </button>
-                ))}
+        <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+          {/* Items principales */}
+          {navItems.map(item => (
+            <button
+              key={item.id}
+              onClick={() => {
+                setCurrentView(item.id);
+                setIsSidebarOpen(false);
+              }}
+              className={`
+                w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-200
+                ${currentView === item.id
+                  ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200/50 dark:shadow-none'
+                  : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'}
+              `}
+            >
+              <item.icon size={20} />
+              <span className="font-bold text-sm">{item.label}</span>
+              {currentView === item.id && (
+                <ChevronRight size={16} className="ml-auto" />
+              )}
+            </button>
+          ))}
+
+          {/* Botón Administración con subitems - Solo visible para admin/manager */}
+          {canAccessAdmin && (
+            <div className="pt-4">
+              <button
+                onClick={() => setAdminExpanded(!adminExpanded)}
+                className={`
+                  w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-200
+                  ${isAdminView
+                    ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600'
+                    : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'}
+                `}
+              >
+                <Settings size={20} />
+                <span className="font-bold text-sm">Administración</span>
+                <ChevronDown
+                  size={16}
+                  className={`ml-auto transition-transform duration-200 ${adminExpanded ? 'rotate-180' : ''}`}
+                />
+              </button>
+
+              {/* Subitems de Administración */}
+              <div className={`
+                overflow-hidden transition-all duration-300 ease-in-out
+                ${adminExpanded ? 'max-h-48 opacity-100 mt-1' : 'max-h-0 opacity-0'}
+              `}>
+                <div className="pl-4 space-y-1">
+                  {adminSubItems.map(item => (
+                    <button
+                      key={item.id}
+                      onClick={() => {
+                        setCurrentView(item.id);
+                        setIsSidebarOpen(false);
+                      }}
+                      className={`
+                        w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200
+                        ${currentView === item.id
+                          ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200/50 dark:shadow-none'
+                          : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'}
+                      `}
+                    >
+                      <item.icon size={18} />
+                      <span className="font-medium text-sm">{item.label}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
-          ))}
+          )}
         </nav>
 
         {/* Footer - Database Management */}
@@ -194,14 +274,22 @@ function Sidebar({ currentView, setCurrentView, isSidebarOpen, setIsSidebarOpen 
             </div>
           )}
 
+          {/* Usuario actual */}
           <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl">
-            <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-900/30 rounded-xl flex items-center justify-center text-indigo-600">
-              <ShieldCheck size={20} />
+            <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-900/30 rounded-xl flex items-center justify-center text-indigo-600 font-bold">
+              {currentUser?.name?.charAt(0).toUpperCase() || 'U'}
             </div>
-            <div>
-              <p className="text-xs font-bold">Admin</p>
-              <p className="text-[10px] text-slate-400">{USE_LOCAL_DB ? 'Modo Local' : 'Firebase'}</p>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold truncate">{currentUser?.name || 'Usuario'}</p>
+              <p className="text-[10px] text-slate-400">{roleLabels[currentUser?.role] || currentUser?.role}</p>
             </div>
+            <button
+              onClick={onLogout}
+              className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl text-slate-400 hover:text-red-500 transition-colors"
+              title="Cerrar sesión"
+            >
+              <LogOut size={16} />
+            </button>
           </div>
         </div>
       </aside>
@@ -209,8 +297,15 @@ function Sidebar({ currentView, setCurrentView, isSidebarOpen, setIsSidebarOpen 
   );
 }
 
-function Header({ setIsSidebarOpen, userId }) {
+function Header({ setIsSidebarOpen, currentUser, onLogout }) {
   const [currentTime, setCurrentTime] = useState(new Date());
+
+  const roleLabels = {
+    admin: 'Administrador',
+    manager: 'Gerente',
+    supervisor: 'Supervisor',
+    operator: 'Operador',
+  };
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -254,13 +349,13 @@ function Header({ setIsSidebarOpen, userId }) {
         {/* User */}
         <div className="flex items-center gap-3 pl-3 border-l dark:border-slate-700">
           <div className="text-right hidden sm:block">
-            <p className="text-xs font-bold">Sistema</p>
-            <p className="text-[10px] text-slate-400 font-mono">
-              {userId?.substring(0, 8) || 'offline'}
+            <p className="text-xs font-bold">{currentUser?.name || 'Usuario'}</p>
+            <p className="text-[10px] text-slate-400">
+              {roleLabels[currentUser?.role] || currentUser?.role}
             </p>
           </div>
-          <div className="h-10 w-10 bg-indigo-100 dark:bg-indigo-900/30 rounded-xl flex items-center justify-center text-indigo-600">
-            <User size={20} />
+          <div className="h-10 w-10 bg-indigo-100 dark:bg-indigo-900/30 rounded-xl flex items-center justify-center text-indigo-600 font-bold">
+            {currentUser?.name?.charAt(0).toUpperCase() || 'U'}
           </div>
         </div>
       </div>
